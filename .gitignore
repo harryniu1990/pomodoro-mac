@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# 构建产物
+Pomodoro.app
+build/
+*.o
+*.dSYM
+
+# 工作区本地文件
+番茄钟.html
+.workbuddy/
+
+# Python
+__pycache__/

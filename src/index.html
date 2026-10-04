@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍅 番茄钟</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --c-work: #e84c3d;
+    --c-break: #26a186;
+    --c-long: #3572b8;
+    --main: #e84c3d;
+    --card: rgba(255,255,255,0.14);
+    --card-border: rgba(255,255,255,0.25);
+    --text: #ffffff;
+  }
+
+  html, body { height: 100%; background: transparent; }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* 外壳：承载背景，圆角胶囊/圆角窗口 */
+  .shell {
+    height: 100%;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--main);
+    animation: fadeIn .4s ease;
+  }
+  body.mini .shell { border-radius: 26px; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  body.mode-work  { --main: var(--c-work); }
+  body.mode-break { --main: var(--c-break); }
+  body.mode-long  { --main: var(--c-long); }
+
+  /* ============ 迷你悬浮条 ============ */
+  .mini-bar {
+    display: none;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px 0 14px;
+    gap: 8px;
+  }
+  body.mini .mini-bar { display: flex; }
+  body.mini .app { display: none; }
+
+  .mini-tomato { font-size: 17px; }
+  .mini-time {
+    flex: 1;
+    text-align: center;
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .mini-btn {
+    width: 32px; height: 32px;
+    border: 1px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    background: rgba(255,255,255,.16);
+    color: #fff; font-size: 13px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  .mini-btn:hover { background: rgba(255,255,255,.32); }
+
+  /* ============ 完整界面 ============ */
+  .app { width: 300px; margin: 0 auto; padding: 18px 0; position: relative; text-align: center; align-self: center; }
+
+  /* 角落按钮 */
+  .btn-corner {
+    position: absolute; top: -6px;
+    width: 26px; height: 26px;
+    border: none; border-radius: 50%;
+    background: rgba(255,255,255,.16);
+    color: rgba(255,255,255,.75);
+    font-size: 15px; line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .btn-corner:hover { background: rgba(255,255,255,.3); color: #fff; }
+  #btn-close { left: -2px; }
+  #btn-shrink { right: -2px; font-size: 13px; padding-bottom: 3px; }
+
+  .modes {
+    display: flex;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 11px;
+    padding: 3px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .modes button {
+    flex: 1;
+    padding: 7px 0;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,.78);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .25s ease;
+  }
+  .modes button.active {
+    background: rgba(255,255,255,.93);
+    color: var(--main);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+
+  .ring-wrap { position: relative; width: 212px; height: 212px; margin: 0 auto 18px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: rgba(255,255,255,.18); stroke-width: 9; }
+  .ring-fg {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 9;
+    stroke-linecap: round;
+    transition: stroke-dashoffset .3s linear;
+    filter: drop-shadow(0 0 5px rgba(255,255,255,.35));
+  }
+  .ring-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .time {
+    font-size: 46px;
+    font-weight: 200;
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .phase-label {
+    margin-top: 8px;
+    font-size: 12px;
+    letter-spacing: 3px;
+    opacity: .85;
+    font-weight: 500;
+  }
+  .session-dots { margin-top: 10px; display: flex; gap: 6px; justify-content: center; }
+  .session-dots span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,.25);
+    transition: all .3s;
+  }
+  .session-dots span.done { background: #fff; transform: scale(1.15); }
+
+  .controls { display: flex; gap: 11px; justify-content: center; }
+
+  .btn-main {
+    width: 122px; padding: 11px 0;
+    border: none; border-radius: 12px;
+    background: rgba(255,255,255,.95);
+    color: var(--main);
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+    box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  }
+  .btn-main:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+  .btn-main:active { transform: translateY(0); }
+
+  .btn-sec {
+    width: 44px; height: 44px;
+    border: 1.5px solid var(--card-border);
+    border-radius: 12px;
+    background: var(--card);
+    color: #fff;
+    font-size: 17px;
+    cursor: pointer;
+    transition: all .15s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .btn-sec:hover { background: rgba(255,255,255,.28); }
+
+  .stats { display: flex; gap: 10px; margin-top: 22px; }
+  .stat {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 11px;
+    padding: 9px 6px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .stat b { display: block; font-size: 17px; font-weight: 700; }
+  .stat span { font-size: 10px; opacity: .8; letter-spacing: 1px; }
+
+  /* ============ 完成确认卡片 ============ */
+  .done-mask {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    display: none;
+    align-items: center; justify-content: center;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    z-index: 30;
+  }
+  .done-mask.show { display: flex; animation: fadeIn .2s ease; }
+
+  .done-card {
+    width: 262px;
+    background: #fff;
+    color: #333;
+    border-radius: 18px;
+    padding: 24px 20px 18px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    animation: popIn .3s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes popIn { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .done-card .emoji { font-size: 40px; line-height: 1; margin-bottom: 10px; }
+  .done-card h4 { font-size: 16px; margin-bottom: 6px; }
+  .done-card p { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .done-actions { display: flex; gap: 8px; }
+  .done-actions button {
+    flex: 1; padding: 10px 0;
+    border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  #done-primary { background: #333; color: #fff; }
+  #done-primary.break-btn { background: #26a186; }
+  #done-secondary { background: #f0f0f0; color: #666; }
+
+  /* ============ 设置弹层 ============ */
+  .settings-mask {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    display: none;
+    align-items: center; justify-content: center;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    z-index: 40;
+  }
+  .settings-mask.show { display: flex; }
+
+  .settings {
+    width: 300px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: #fff;
+    color: #333;
+    border-radius: 16px;
+    padding: 20px 18px 16px;
+    text-align: left;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    animation: popIn .25s cubic-bezier(.2,1.4,.4,1);
+  }
+  .settings h3 { font-size: 15px; margin-bottom: 14px; text-align: center; }
+  .settings .group-title {
+    font-size: 11px; color: #999; letter-spacing: 1px;
+    margin: 4px 0 8px; font-weight: 600;
+  }
+
+  .field {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .field label { font-size: 13px; color: #555; }
+  .field input {
+    width: 70px; padding: 6px 8px;
+    border: 1.5px solid #e0e0e0; border-radius: 8px;
+    font-size: 14px; text-align: center;
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .field input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .field input:focus { border-color: #d9432f; }
+
+  .field.color-field input[type="color"] {
+    width: 46px; height: 30px; padding: 2px;
+    border: 1.5px solid #e0e0e0; border-radius: 8px;
+    background: #fff; cursor: pointer;
+  }
+  .field.color-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .field.color-field input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+
+  .presets { display: flex; gap: 8px; margin: 2px 0 12px; }
+  .preset {
+    flex: 1; height: 40px;
+    border: 1.5px solid #eee; border-radius: 9px;
+    cursor: pointer; display: flex; overflow: hidden;
+    transition: all .15s ease;
+  }
+  .preset:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,.12); }
+  .preset i { flex: 1; }
+  .preset.selected { border-color: #333; box-shadow: 0 0 0 2px rgba(51,51,51,.15); }
+
+  .settings .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .settings .actions button {
+    flex: 1; padding: 9px 0;
+    border: none; border-radius: 9px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  #btn-cancel { background: #f0f0f0; color: #666; }
+  #btn-save { background: #d9432f; color: #fff; }
+
+  .tip { margin-top: 10px; font-size: 11px; color: #999; text-align: center; }
+</style>
+</head>
+<body class="mode-work">
+
+<div class="shell" id="shell">
+
+  <!-- 迷你悬浮条 -->
+  <div class="mini-bar" id="mini-bar">
+    <span class="mini-tomato">🍅</span>
+    <span class="mini-time" id="mini-time" title="点击展开">25:00</span>
+    <button class="mini-btn" id="mini-toggle" title="开始/暂停">▶</button>
+    <button class="mini-btn" id="mini-expand" title="展开">⤢</button>
+  </div>
+
+  <!-- 完整界面 -->
+  <div class="app" id="app">
+    <button class="btn-corner" id="btn-close" title="关闭">×</button>
+    <button class="btn-corner" id="btn-shrink" title="缩小为悬浮条">—</button>
+
+    <div class="modes">
+      <button data-mode="work" class="active">专注</button>
+      <button data-mode="break">短休息</button>
+      <button data-mode="long">长休息</button>
+    </div>
+
+    <div class="ring-wrap">
+      <svg width="212" height="212" viewBox="0 0 212 212">
+        <circle class="ring-bg" cx="106" cy="106" r="96"/>
+        <circle class="ring-fg" id="ring" cx="106" cy="106" r="96"/>
+      </svg>
+      <div class="ring-center">
+        <div class="time" id="time">25:00</div>
+        <div class="phase-label" id="phase-label">准备专注</div>
+        <div class="session-dots" id="dots"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-sec" id="btn-reset" title="重置">↺</button>
+      <button class="btn-main" id="btn-start">开 始</button>
+      <button class="btn-sec" id="btn-settings" title="设置">⚙</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="stat-today">0</b><span>今日番茄</span></div>
+      <div class="stat"><b id="stat-focus">0 分钟</b><span>今日专注</span></div>
+      <div class="stat"><b id="stat-total">0</b><span>累计番茄</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 完成确认 -->
+<div class="done-mask" id="done-mask">
+  <div class="done-card">
+    <div class="emoji" id="done-emoji">🍅</div>
+    <h4 id="done-title">专注完成！</h4>
+    <p id="done-desc"></p>
+    <div class="done-actions">
+      <button id="done-primary">开始休息</button>
+      <button id="done-secondary" style="display:none">跳过休息</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="settings-mask" id="mask">
+  <div class="settings">
+    <h3>⚙ 设置</h3>
+
+    <div class="group-title">主题配色</div>
+    <div class="presets" id="presets"></div>
+    <div class="field color-field"><label>专注颜色</label><input type="color" id="in-c-work" value="#e84c3d"></div>
+    <div class="field color-field"><label>短休息颜色</label><input type="color" id="in-c-break" value="#26a186"></div>
+    <div class="field color-field"><label>长休息颜色</label><input type="color" id="in-c-long" value="#3572b8"></div>
+
+    <div class="group-title" style="margin-top:12px">定时（分钟）</div>
+    <div class="field"><label>专注时长</label><input type="number" id="in-work" min="1" max="180" value="25"></div>
+    <div class="field"><label>短休息</label><input type="number" id="in-break" min="1" max="60" value="5"></div>
+    <div class="field"><label>长休息</label><input type="number" id="in-long" min="1" max="90" value="15"></div>
+    <div class="field"><label>每几个番茄长休息</label><input type="number" id="in-round" min="2" max="10" value="4"></div>
+
+    <div class="actions">
+      <button id="btn-cancel">取消</button>
+      <button id="btn-save">保存</button>
+    </div>
+    <div class="tip">改动在下一个计时周期生效</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const LS_KEY = 'pomodoro-settings-v1';
+  const LS_STAT = 'pomodoro-stats-v1';
+
+  // ---- 设置 ----
+  let settings = { work: 25, break: 5, long: 15, round: 4, cWork: '#e84c3d', cBreak: '#26a186', cLong: '#3572b8' };
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if (s) settings = Object.assign(settings, s);
+  } catch (e) {}
+
+  const PRESETS = [
+    { name: '经典', cWork: '#e84c3d', cBreak: '#26a186', cLong: '#3572b8' },
+    { name: '蜜桃', cWork: '#f2766d', cBreak: '#7ec8a9', cLong: '#7d9bd1' },
+    { name: '落日', cWork: '#e8762c', cBreak: '#d9a413', cLong: '#a24e8f' },
+    { name: '薰衣草', cWork: '#9b6bd1', cBreak: '#5bb8a5', cLong: '#5170b8' },
+    { name: '墨色', cWork: '#4a4a52', cBreak: '#5d6d5f', cLong: '#3e5875' }
+  ];
+
+  // ---- 统计 ----
+  let stats = { date: todayStr(), today: 0, focusMin: 0, total: 0 };
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_STAT));
+    if (s) {
+      if (s.date === todayStr()) stats = s;
+      else stats = { date: todayStr(), today: 0, focusMin: 0, total: s.total || 0 };
+    }
+  } catch (e) {}
+
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function saveStats() { localStorage.setItem(LS_STAT, JSON.stringify(stats)); }
+
+  // ---- 状态 ----
+  const MODES = {
+    work:  { label: '专注中…', ready: '准备专注', cls: 'mode-work' },
+    break: { label: '短休息中…', ready: '准备休息', cls: 'mode-break' },
+    long:  { label: '长休息中…', ready: '准备长休息', cls: 'mode-long' }
+  };
+  let mode = 'work';
+  let running = false;
+  let totalSec = settings.work * 60;
+  let leftSec = totalSec;
+  let timerId = null;
+  let completedInRound = 0;
+
+  // ---- DOM ----
+  const $ = id => document.getElementById(id);
+  const timeEl = $('time'), labelEl = $('phase-label'), ringEl = $('ring');
+  const btnStart = $('btn-start'), dotsEl = $('dots'), presetsEl = $('presets');
+  const miniTimeEl = $('mini-time'), miniToggleEl = $('mini-toggle');
+  const doneMask = $('done-mask');
+  const shellEl = $('shell');
+
+  const R = 96, CIRC = 2 * Math.PI * R;
+  ringEl.style.strokeDasharray = CIRC;
+  ringEl.style.strokeDashoffset = 0;
+
+  // ---- 与桌面 App 通信（网页版自动降级为无操作） ----
+  function postToApp(msg) {
+    try {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.state) {
+        window.webkit.messageHandlers.state.postMessage(msg);
+      }
+    } catch (e) {}
+  }
+
+  // ---- 窗口拖拽：按住非按钮区域拖动，通知 App 移动窗口 ----
+  let lastDragEnd = 0;
+  (function initDrag() {
+    const shell = document.getElementById('shell');
+    let dragging = false, lastX = 0, lastY = 0, moved = false;
+    const INTERACTIVE = 'button, input, a, .preset';
+
+    shell.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      if (e.target.closest(INTERACTIVE)) return;   // 按钮等交互元素不触发拖拽
+      dragging = true; moved = false;
+      lastX = e.clientX; lastY = e.clientY;
+      try { shell.setPointerCapture(e.pointerId); } catch (err) {}
+      document.body.style.cursor = 'grabbing';
+    });
+
+    shell.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      if (dx !== 0 || dy !== 0) {
+        moved = true;
+        postToApp({ type: 'move', dx: dx, dy: dy });
+      }
+    });
+
+    function end() {
+      if (!dragging) return;
+      dragging = false;
+      if (moved) lastDragEnd = Date.now();
+      document.body.style.cursor = '';
+    }
+    shell.addEventListener('pointerup', end);
+    shell.addEventListener('pointercancel', end);
+  })();
+
+  // ---- 主题 ----
+  function applyColors() {
+    const root = document.documentElement.style;
+    root.setProperty('--c-work', settings.cWork);
+    root.setProperty('--c-break', settings.cBreak);
+    root.setProperty('--c-long', settings.cLong);
+    paintBackground();
+  }
+
+  function hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  }
+  function mix(hex, target, ratio) {
+    const a = hexToRgb(hex);
+    return 'rgb(' + a.map(v => Math.round(v + (target - v) * ratio)).join(',') + ')';
+  }
+
+  function paintBackground() {
+    const c = { work: settings.cWork, break: settings.cBreak, long: settings.cLong }[mode] || settings.cWork;
+    shellEl.style.background =
+      'linear-gradient(160deg, ' + mix(c, 255, 0.15) + ' 0%, ' + c + ' 55%, ' + mix(c, 0, 0.22) + ' 100%)';
+  }
+
+  // ---- 迷你 / 展开切换 ----
+  function setMini(mini) {
+    document.body.classList.toggle('mini', mini);
+    postToApp(mini ? 'mini' : 'full');
+  }
+
+  // ---- 渲染 ----
+  function fmt(s) {
+    const m = Math.floor(s / 60), r = s % 60;
+    return String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+  }
+
+  function render() {
+    const t = fmt(leftSec);
+    timeEl.textContent = t;
+    miniTimeEl.textContent = t;
+    const p = leftSec / totalSec;
+    ringEl.style.strokeDashoffset = CIRC * (1 - p);
+    labelEl.textContent = running ? MODES[mode].label : MODES[mode].ready;
+    btnStart.textContent = running ? '暂 停' : (leftSec < totalSec ? '继 续' : '开 始');
+    miniToggleEl.textContent = running ? '❚❚' : '▶';
+    renderDots();
+    renderStats();
+    document.title = (running ? '🍅 ' : '') + t + ' — 番茄钟';
+  }
+
+  function renderDots() {
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < settings.round; i++) {
+      const s = document.createElement('span');
+      if (i < completedInRound) s.className = 'done';
+      dotsEl.appendChild(s);
+    }
+  }
+
+  function renderStats() {
+    $('stat-today').textContent = stats.today;
+    $('stat-focus').textContent = stats.focusMin + ' 分钟';
+    $('stat-total').textContent = stats.total;
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.body.className = document.body.className.replace(/mode-\w+/g, '').trim() + ' ' + MODES[m].cls;
+    totalSec = settings[m] * 60;
+    leftSec = totalSec;
+    stop();
+    paintBackground();
+    render();
+  }
+
+  // ---- 计时 ----
+  function tick() {
+    leftSec--;
+    if (leftSec <= 0) {
+      leftSec = 0;
+      render();
+      finish();
+      return;
+    }
+    render();
+  }
+
+  function start() {
+    if (!running) {
+      running = true;
+      timerId = setInterval(tick, 1000);
+      askNotify();
+      render();
+    }
+  }
+
+  function stop() {
+    running = false;
+    if (timerId) { clearInterval(timerId); timerId = null; }
+    render();
+  }
+
+  // ---- 完成：弹确认卡片，等用户选择 ----
+  function finish() {
+    stop();
+    playSound();
+
+    if (mode === 'work') {
+      // 先记账
+      stats.today++; stats.total++; stats.focusMin += settings.work;
+      saveStats();
+      completedInRound++;
+      let next;
+      if (completedInRound >= settings.round) {
+        completedInRound = 0;
+        next = 'long';
+      } else {
+        next = 'break';
+      }
+      renderDots();
+      showDoneCard({
+        emoji: '🍅',
+        title: '专注完成！',
+        desc: '已完成 ' + stats.today + ' 个番茄，休息一下？',
+        primary: next === 'long' ? '开始长休息' : '开始短休息',
+        primaryClass: 'break-btn',
+        secondary: '跳过休息',
+        onPrimary: () => setMode(next),
+        onSecondary: () => setMode('work')
+      });
+    } else {
+      showDoneCard({
+        emoji: '⏰',
+        title: '休息结束',
+        desc: '精神满满，开始新的专注吧！',
+        primary: '开始专注',
+        primaryClass: '',
+        secondary: null,
+        onPrimary: () => setMode('work'),
+        onSecondary: null
+      });
+    }
+    // 通知 App：弹出窗口抢焦点
+    postToApp('done');
+  }
+
+  function showDoneCard(opt) {
+    $('done-emoji').textContent = opt.emoji;
+    $('done-title').textContent = opt.title;
+    $('done-desc').textContent = opt.desc;
+    const p = $('done-primary'), s = $('done-secondary');
+    p.textContent = opt.primary;
+    p.className = opt.primaryClass || '';
+    p.onclick = () => { hideDoneCard(); opt.onPrimary(); };
+    if (opt.secondary) {
+      s.style.display = '';
+      s.textContent = opt.secondary;
+      s.onclick = () => { hideDoneCard(); opt.onSecondary(); };
+    } else {
+      s.style.display = 'none';
+    }
+    doneMask.classList.add('show');
+  }
+
+  function hideDoneCard() { doneMask.classList.remove('show'); }
+
+  // ---- 通知与音效 ----
+  function askNotify() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  let audioCtx = null;
+  function playSound() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [880, 1108.7, 1318.5];
+      notes.forEach((f, i) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        const t = audioCtx.currentTime + i * 0.18;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t); o.stop(t + 0.9);
+      });
+    } catch (e) {}
+  }
+
+  // ---- 事件 ----
+  document.querySelectorAll('.modes button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.modes button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      hideDoneCard();
+      setMode(b.dataset.mode);
+    });
+  });
+
+  btnStart.addEventListener('click', () => running ? stop() : start());
+  miniToggleEl.addEventListener('click', () => running ? stop() : start());
+
+  $('btn-reset').addEventListener('click', () => {
+    stop();
+    leftSec = totalSec;
+    render();
+  });
+
+  // 迷你条：点时间或 ⤢ 展开（刚拖拽完则忽略，避免误触）
+  miniTimeEl.addEventListener('click', () => {
+    if (Date.now() - lastDragEnd < 250) return;
+    setMini(false);
+  });
+  $('mini-expand').addEventListener('click', () => setMini(false));
+
+  // 完整界面：缩小 / 关闭
+  $('btn-shrink').addEventListener('click', () => setMini(true));
+  $('btn-close').addEventListener('click', () => postToApp('quit'));
+
+  // ---- 设置弹层 ----
+  const mask = $('mask');
+  let pendingColors = { cWork: settings.cWork, cBreak: settings.cBreak, cLong: settings.cLong };
+  let selectedPreset = -1;
+
+  function buildPresets() {
+    presetsEl.innerHTML = '';
+    PRESETS.forEach((p, idx) => {
+      const div = document.createElement('div');
+      div.className = 'preset' + (selectedPreset === idx ? ' selected' : '');
+      div.title = p.name;
+      ['cWork', 'cBreak', 'cLong'].forEach(k => {
+        const i = document.createElement('i');
+        i.style.background = p[k];
+        div.appendChild(i);
+      });
+      div.addEventListener('click', () => {
+        selectedPreset = idx;
+        pendingColors = { cWork: p.cWork, cBreak: p.cBreak, cLong: p.cLong };
+        $('in-c-work').value = p.cWork;
+        $('in-c-break').value = p.cBreak;
+        $('in-c-long').value = p.cLong;
+        buildPresets();
+      });
+      presetsEl.appendChild(div);
+    });
+  }
+
+  $('btn-settings').addEventListener('click', () => {
+    $('in-work').value = settings.work;
+    $('in-break').value = settings.break;
+    $('in-long').value = settings.long;
+    $('in-round').value = settings.round;
+    pendingColors = { cWork: settings.cWork, cBreak: settings.cBreak, cLong: settings.cLong };
+    selectedPreset = PRESETS.findIndex(p =>
+      p.cWork === settings.cWork && p.cBreak === settings.cBreak && p.cLong === settings.cLong);
+    $('in-c-work').value = settings.cWork;
+    $('in-c-break').value = settings.cBreak;
+    $('in-c-long').value = settings.cLong;
+    buildPresets();
+    mask.classList.add('show');
+  });
+
+  $('btn-cancel').addEventListener('click', () => mask.classList.remove('show'));
+  mask.addEventListener('click', e => { if (e.target === mask) mask.classList.remove('show'); });
+
+  ['in-c-work', 'in-c-break', 'in-c-long'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      selectedPreset = -1;
+      pendingColors = { cWork: $('in-c-work').value, cBreak: $('in-c-break').value, cLong: $('in-c-long').value };
+      buildPresets();
+    });
+  });
+
+  $('btn-save').addEventListener('click', () => {
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, parseInt(v) || min));
+    settings.work  = clamp($('in-work').value, 1, 180);
+    settings.break = clamp($('in-break').value, 1, 60);
+    settings.long  = clamp($('in-long').value, 1, 90);
+    settings.round = clamp($('in-round').value, 2, 10);
+    settings.cWork  = pendingColors.cWork;
+    settings.cBreak = pendingColors.cBreak;
+    settings.cLong  = pendingColors.cLong;
+    localStorage.setItem(LS_KEY, JSON.stringify(settings));
+    applyColors();
+    mask.classList.remove('show');
+    completedInRound = Math.min(completedInRound, settings.round);
+    setMode(mode);
+  });
+
+  // 空格键 开始/暂停
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !mask.classList.contains('show') && !doneMask.classList.contains('show')) {
+      e.preventDefault();
+      running ? stop() : start();
+    }
+  });
+
+  // 初始化
+  setMode('work');
+})();
+</script>
+</body>
+</html>
