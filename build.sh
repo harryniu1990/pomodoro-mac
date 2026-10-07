@@ -49,6 +49,13 @@ else
   echo "提示: 未安装 Pillow，跳过图标生成（不影响使用）"
 fi
 
+# 4. Ad-hoc 签名（无开发者证书也能签，避免被系统判定为「已损坏」）
+if codesign -s - --force --deep --timestamp=none "$APP" 2>/dev/null; then
+  echo "已 ad-hoc 签名"
+else
+  echo "提示: 签名失败（不影响本机使用，分发时建议重试）"
+fi
+
 echo ""
 echo "构建完成 → $APP"
 echo "双击运行: open $APP"
