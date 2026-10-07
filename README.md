@@ -20,7 +20,15 @@
 
 ## 安装
 
-**方式一：自己构建**（推荐，干净放心）
+**方式一：下载安装包**（推荐）
+
+👉 [Releases 页面](https://github.com/harryniu1990/pomodoro-mac/releases/latest) 下载 `Pomodoro-1.0.dmg`，双击后把 `Pomodoro` 拖进 Applications 即可。
+
+- 通用二进制：Apple Silicon (M 系列) + Intel 原生支持
+- 系统要求：macOS 11.0+
+- 首次打开若被系统拦截：`xattr -cr /Applications/Pomodoro.app`
+
+**方式二：自己构建**（干净放心）
 
 ```bash
 git clone https://github.com/harryniu1990/pomodoro-mac.git

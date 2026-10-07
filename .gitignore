@@ -4,6 +4,8 @@
 # 构建产物
 Pomodoro.app
 build/
+dist/
+dmg-src/
 *.o
 *.dSYM
 
