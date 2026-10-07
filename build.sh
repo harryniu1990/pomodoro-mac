@@ -9,17 +9,34 @@ APP="Pomodoro.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-# 1. 编译 Swift 外壳
-swiftc -O -framework Cocoa -framework WebKit \
-  -o "$APP/Contents/MacOS/Pomodoro" \
-  src/main.swift
+# 1. 编译 Swift 外壳（默认构建 arm64 + x86_64 通用二进制）
+mkdir -p /tmp/pomodoro-build
+if swiftc -O -target x86_64-apple-macosx11.0 -framework Cocoa -framework WebKit \
+     -o /tmp/pomodoro-build/pom_x86 src/main.swift 2>/tmp/pomodoro-build/x86.log; then
+  swiftc -O -framework Cocoa -framework WebKit \
+    -o /tmp/pomodoro-build/pom_arm src/main.swift
+  lipo -create -output "$APP/Contents/MacOS/Pomodoro" \
+    /tmp/pomodoro-build/pom_arm /tmp/pomodoro-build/pom_x86
+  echo "已构建通用二进制 (Apple Silicon + Intel)"
+else
+  echo "提示: Intel 架构编译不可用，仅构建本机架构"
+  swiftc -O -framework Cocoa -framework WebKit \
+    -o "$APP/Contents/MacOS/Pomodoro" src/main.swift
+fi
 
 # 2. 打包页面
 cp src/index.html "$APP/Contents/Resources/index.html"
 
-# 3. 生成图标（需要 Python + Pillow，可跳过）
-if python3 -c "import PIL" 2>/dev/null; then
-  python3 assets/make_icon.py /tmp/icon_1024.png
+# 3. 生成图标（需要 Python + Pillow，找不到就跳过）
+PY=""
+for cand in python3 "$HOME/.workbuddy/binaries/python/envs/default/bin/python3" /usr/bin/python3; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import PIL" 2>/dev/null; then
+    PY="$cand"; break
+  fi
+done
+
+if [ -n "$PY" ]; then
+  "$PY" assets/make_icon.py /tmp/icon_1024.png >/dev/null
   ICONSET=/tmp/Pomodoro.iconset
   rm -rf "$ICONSET" && mkdir -p "$ICONSET"
   for size in 16 32 64 128 256 512; do
